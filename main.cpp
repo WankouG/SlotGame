@@ -9,7 +9,7 @@ struct symbol {
 };
 
 int credit  = 100;
-struct symbol symbols[] = {
+symbol symbols[] = {
     {"Cherry", 10},
     {"Lemon", 20},
     {"Orange", 30},
@@ -22,7 +22,7 @@ struct symbol symbols[] = {
 int main() {
     //変数宣言と初期化処理
     int bet = 0;
-    struct symbol* real_symbols[3]; //リールのシンボルを格納する配列。
+    symbol* real_symbols[3]; //リールのシンボルを格納する配列。
     std::srand(std::time(0)); // 乱数のシードを現在の時刻で初期化
     
 
