@@ -22,15 +22,30 @@ symbol symbols[] = {
 int main() {
     //変数宣言と初期化処理
     int bet = 0;
+    const char* select_menu[] = {"start", "Exit"}; //セレクトメニューの選択肢を格納する配列。いずれ矢印で選択できるようにする予定。
+    int choice = 0; //ユーザーの選択を格納する変数。
     symbol* real_symbols[3]; //リールのシンボルを格納する配列。
     std::srand(std::time(0)); // 乱数のシードを現在の時刻で初期化
     
 
     std::cout << "Welcome to the Slot Game!" << std::endl;
     //ゲームループ作成
-    while(credit >0){
+    while(true){
         // クレジット処理
         std::cout << "You have " << credit << " credits." << std::endl;
+
+        //ゲームを継続するか、終了するかをユーザーに尋ねる
+        std::cout << select_menu[0] << " or " << select_menu[1] << "? (Enter 0 for start, 1 for exit): ";
+        std::cin >> choice;
+        // ユーザーの選択に応じて処理を分岐する.０はゲーム開始、１は終了、その他の値は無効な選択として再度入力を促す。
+        if (choice == 1) {
+            std::cout << "Thank you for playing! Your final credit is: " << credit << std::endl;
+            break;
+        }
+        else if (choice != 0) {
+            std::cout << "Invalid choice. Please enter 0 to start or 1 to exit." << std::endl;
+            continue;
+        }
 
         // ユーザーに有効なベット額を入力させる
         std::cout << "your bet credit: " << std::endl;
@@ -74,6 +89,12 @@ int main() {
             std::cout << "JACKPOT!" << std::endl;
             credit += real_symbols[0]->payout * bet;
             std::cout << "you win" << real_symbols[0]->payout * bet << " credits paied!" << std::endl;
+        }
+
+        //抽選後、クレジットが０以下になった場合、ゲームを終了する。
+        if (credit <= 0) {
+            std::cout << "Thank you for playing! Your final credit is: " << credit << std::endl;
+            break;
         }
     }
     return 0;
