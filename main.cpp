@@ -14,7 +14,7 @@ struct symbol {
     float multiplier;
 };
 
-int credit  = 100;
+
 
 symbol symbols[] = {
     {"Cherry", 1.1},
@@ -37,25 +37,23 @@ enum class GameState {
 void init();
 int get_bet();
 GameState get_choice();
-void spin_reals(symbol* real_symbols[]);
-void slot_lottery(symbol* real_symbols[], int bet);
+void spin_reels(symbol* reel_symbols[]);
+float slot_lottery(symbol* reel_symbols[], int bet);
 void render_menu(int choice);
 int get_key();
 
 int main() {
     //変数宣言と初期化処理
-    #ifdef _WIN32
-        int bet = 0;
-        GameState choice = GameState::START; //ユーザーの選択を格納する変数。ゲームステート型
-        symbol* real_symbols[3]; //リールのシンボルを格納する配列。
-        std::srand(std::time(0)); // 乱数のシードを現在の時刻で初期化
-    #else
-        int bet = 0;
-        GameState choice = GameState::START; //ユーザーの選択を格納する変数。ゲームステート型
-        symbol* real_symbols[3]; //リールのシンボルを格納する配列。
-        std::srand(std::time(0)); // 乱数のシードを現在の時刻で初期化
-        init();
+    #ifndef _WIN32
+        init();       
     #endif
+
+    int credit  = 100;
+    int bet = 0;
+    float dividend = 0.0;
+    GameState choice = GameState::START; //ユーザーの選択を格納する変数。ゲームステート型
+    symbol* reel_symbols[3]; //リールのシンボルを格納する配列。
+    std::srand(std::time(0)); // 乱数のシードを現在の時刻で初期化
     
     //ゲームループ作成
     while(true){
@@ -80,10 +78,11 @@ int main() {
                 std::cout << "you bet " << bet << " credits." << "your credit is now " << credit << std::endl;
                 //リールの表示。
                 //シンボルリストに乱数を使って、リールのシンボルを決定する。
-                spin_reals(real_symbols);
+                spin_reels(reel_symbols);
 
                 //抽選処理
-                slot_lottery(real_symbols, bet);
+                dividend = slot_lottery(reel_symbols, bet);
+                credit += (bet * dividend);
 
                 //結果の表示処理
                 std::cout << "Press the Enter key to spin the slots again with the current bet amount." << std::endl;
@@ -131,9 +130,9 @@ void init(){
     #endif
 }
 
-GameState get_choice() {
+GameState get_choice(int credit) {
     int choice = 0;
-    render_menu(choice); // メニューを描画する関数を呼び出す
+    render_menu(credit,choice); // メニューを描画する関数を呼び出す
 
     while(true) {
     // 上下キーの入力を格納する変数
@@ -145,7 +144,7 @@ GameState get_choice() {
                         拡張キーは、通常のキーとは異なる特別なキーであり、矢印キーやファンクションキーなどが含まれます。
                         _getch()関数は、拡張キーを押した場合、最初に0または0xE0を返し、次に実際のキーコードを返します。*/     
                         key = get_key();
-                        render_menu(choice); // メニューを描画する関数を呼び出す
+                        render_menu(credit,choice); // メニューを描画する関数を呼び出す
                         if (key == 72) { // 上ボタンが押された場合の処理
                             choice = (choice - 1 + 2) % 2; // 上ボタンが押された場合、選択肢を上に移動させる。選択肢は0と1の2つなので、2で割った余りを取ることで循環させる。
                         }
@@ -192,7 +191,7 @@ GameState get_choice() {
         }
 }
 
-int get_bet() {
+int get_bet(int credit) {
     // ユーザーに有効なベット額を入力させる
     int bet = 0;
 
@@ -220,7 +219,7 @@ int get_bet() {
 }
 
 
-void spin_reals(symbol* real_symbols[]) {
+void spin_reels(symbol* real_symbols[]) {
      for (int i = 0; i < 3; i++) {
             real_symbols[i] = &symbols[std::rand() % 6];
             std::cout << real_symbols[i]->name << " ";
@@ -229,19 +228,23 @@ void spin_reals(symbol* real_symbols[]) {
         std::cout << "\n" << std::endl;
 }
 
-void slot_lottery(symbol* real_symbols[], int bet) {
+float slot_lottery(symbol* reel_symbols[], int bet) {
         //あたり抽選。シンボルごとに配当を用意する予定。
-        if (real_symbols[0] == real_symbols[1] && real_symbols[1] == real_symbols[2]){
+        float dividendo = 0.0;
+        if (reel_symbols[0] == reel_symbols[1] && reel_symbols[1] == reel_symbols[2]){
             std::cout << "\033[33mJACKPOT!!\033[0m" << std::endl;
-            credit += real_symbols[0]->multiplier * bet;
-            std::cout << "you win" << real_symbols[0]->multiplier * bet << " credits paied!" << std::endl;
+            std::cout << "you win" << reel_symbols[0]->multiplier * bet << " credits paied!" << std::endl;
+            dividendo = reel_symbols[0]->multiplier;
         }
         else {
             std::cout << "No win this time. Better luck next spin!\n" << std::endl;
+            dividendo = 0.0;
         }
+
+        return dividendo;
 }
 
-void render_menu(int choice) {
+void render_menu(int credit, int choice) {
         //描画処理。現在の選択肢を黄色で表示する。選択肢の描画は、コンソールのカーソル位置を制御することで実現できる。
         std::cout << "\033[2J\033[3J\033[1;1H" << std::flush; // 画面をクリアしてカーソルを左上に移動するANSIエスケープシーケンス
         std::cout << "Welcome to the Slot Game!" << std::endl;
