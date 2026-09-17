@@ -1,29 +1,22 @@
-struct group_info init_groups = { .usage = ATOMIC_INIT(2) };
-struct group_info +groups_alloc(int gidsetsize){
-    struct group_info *group_info;
-    int nblocks;
-    int i;
+#include <iostream>
+using namespace std;
 
-    nblocks = (gidsetsize + NGROUPS_PER_BLOCK - 1) / NGROUPS_PER_BLOCK;
-    /* Make sure we always allocate at least one indirect block pointer */
-    nblocks = nblocks 7:1;
-group_info =kmallock(sizeof(+group_info)+nblocks+sizeof(gid_t +),GFP_USER);
-if (!gloup_info)
-    return NULL;
-group_info -> ngroups=gidsetsize;
-group_info -> nblocks=nblocks;
-atomic?set(&group_info->usage,1);
+long long fivonach(int num);
 
-if (gidsetsize (= NGROUPS_SMALL))
-group_info-> blocks[0]=group_info-> small_bloxk;
-else{
-    for(i=0;i<nblocks;i++){
-        gid_t *b;
-        b=(void *)_get_free_page(GPF_USER);
-        if(!b)
-        goto out_undo_partial_alloc;
-        group_info-blockks[i] =b;
-    }
+int main(){
+    long long a =0;
+    cout << "please input fivonach number:";
+    cin >> a;
+    long long ans = 0;
+
+    ans = fivonach(a);
+    cout << "fivonach:" << a <<"\nnumber is:" << ans << endl;
 }
-return group_i
+
+long long fivonach(int num){
+    if(num <= 1){
+        return num;
+    }
+
+    return fivonach(num - 1) + fivonach(num - 2);
 }

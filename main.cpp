@@ -11,18 +11,16 @@
 
 struct symbol {
     const char* name;
-    float multiplier;
+    int multiplier;
 };
 
-
-
 symbol symbols[] = {
-    {"Cherry", 1.1},
-    {"Lemon", 1.5},
-    {"Orange", 2.0},
-    {"Plum", 4.0},
-    {"Bell", 4.5},
-    {"Bar", 10.0}
+    {"Cherry", 1},
+    {"Lemon", 2},
+    {"Orange", 2},
+    {"Plum", 4},
+    {"Bell", 5},
+    {"Bar", 10}
 };
 
 //enum群
@@ -30,17 +28,27 @@ enum class GameState {
     START,
     BET,
     PLAY,
+    PLAY_WAIT,
     EXIT,
+};
+
+struct GameData {
+    int credit = 100;
+    int bet = 0;
+    int choice = 0;
+    int dividend = 0;
+    GameState gamestate = GameState::START; //ユーザーの選択を格納する変数。ゲームステート型
+    symbol* reel_symbols[3]; //リールのシンボルを格納する配列。
 };
 
 //関数プロトタイプ宣言
 void init();
-int get_bet();
-GameState get_choice();
-void spin_reels(symbol* reel_symbols[]);
-float slot_lottery(symbol* reel_symbols[], int bet);
-void render_menu(int choice);
+int get_bet(int credit);
+void spin_reels(GameData &gamedata);
+int slot_lottery(const GameData &gamedata);
+void render_menu(const GameData &gamedata);
 int get_key();
+void get_clear_cli();
 
 int main() {
     //変数宣言と初期化処理
@@ -48,74 +56,111 @@ int main() {
         init();       
     #endif
 
-    int credit  = 100;
-    int bet = 0;
-    float dividend = 0.0;
-    GameState choice = GameState::START; //ユーザーの選択を格納する変数。ゲームステート型
-    symbol* reel_symbols[3]; //リールのシンボルを格納する配列。
     std::srand(std::time(0)); // 乱数のシードを現在の時刻で初期化
+    GameData gamedata;
     
     //ゲームループ作成
     while(true){
-        switch(choice){
-            case GameState::START:
-                choice = get_choice(); // ユーザーの選択を取得する関数を呼び出す
-                // ユーザーのクレジット残高を表示する
-                // ユーザーの選択に応じて処理を分岐する.０はゲーム開始、１は終了、その他の値は無効な選択として再度入力を促す。
-                if (choice == GameState::EXIT) {
-                    std::cout << "Thank you for playing! Your final credit is: " << credit << std::endl;
-                    break;
-                }
-                break;
-            case GameState::BET:
-                bet = get_bet(); // ユーザーにベット額を入力させる関数を呼び出す
-                choice = GameState::PLAY;
-                break;
+        render_menu(gamedata);
+        switch(gamedata.gamestate){
+            case GameState::START:{
+                    // 上下キーの入力を格納する変数
+                #ifdef _WIN32
+                    int key = get_key();
+                    if (key == 0 || key == 0xE0) {  
+                                /* 上ボタンが押された場合の処理.
+                                0xE0は拡張キーのプレフィックスコードです。0xは以下のコードが16進数であることを示す接頭辞です。
+                                拡張キーは、通常のキーとは異なる特別なキーであり、矢印キーやファンクションキーなどが含まれます。
+                                _getch()関数は、拡張キーを押した場合、最初に0または0xE0を返し、次に実際のキーコードを返します。*/     
+                                key = get_key();
+                                if (key == 72) { // 上ボタンが押された場合の処理
+                                    gamedata.choice = (gamedata.choice - 1 + 2) % 2; // 上ボタンが押された場合、選択肢を上に移動させる。選択肢は0と1の2つなので、2で割った余りを取ることで循環させる。
+                                }
+                                else if (key == 80) { // 下ボタンが押された場合の処理
+                                    gamedata.choice = (gamedata.choice + 1 ) % 2; // 下ボタンが押された場合、選択肢を下に移動させる。選択肢は0と1の2つなので、2で割った余りを取ることで循環させる。
+                                }
+                            }
+                    else if (key == 13) { // 決定ボタンが押された場合
+                                gamedata.gamestate = gamedata.choice == 0 ? GameState::BET : GameState::EXIT; // 選択肢に応じてGameStateを返す
+                            }
+                    else {
+                        continue;
+                        }
+                #else
+                    int key = get_key();
+                    if(key == KEY_UP){
+                        choice = (choice - 1 + 2) % 2;
+                    }
+                    else if(key == KEY_DOWN){
+                        choice = (choice + 1) % 2;
+                    }
 
-            case GameState::PLAY: 
-                std::cout << "\033[2J\033[3J\033[1;1H" << std::flush;   
-                credit -= bet;
-                std::cout << "you bet " << bet << " credits." << "your credit is now " << credit << std::endl;
+                    if(key == '\n'){
+                        return choice == 0 ? GameState::BET : GameState::EXIT;
+                    }
+                    for (int i = 0; i < 2; i++) {
+                            if (i == choice) {
+                                    std::cout << "\033[33m" << (i == 0 ? "Start" : "Exit") << "\033[0m" << std::endl; // 選択中の項目を黄色で表示するANSIエスケープシーケンス
+                            }
+                            else {
+                                    std::cout << (i == 0 ? "Start" : "Exit") << std::endl;
+                            }
+                        }
+                #endif // ユーザーの選択を取得する関数を呼び出す
+                break;
+            }
+            case GameState::BET:{
+                gamedata.bet = get_bet(gamedata.credit); // ユーザーにベット額を入力させる関数を呼び出す
+                gamedata.gamestate = GameState::PLAY;
+                break;
+            }
+            case GameState::PLAY: {
+                gamedata.credit -= gamedata.bet;
                 //リールの表示。
                 //シンボルリストに乱数を使って、リールのシンボルを決定する。
-                spin_reels(reel_symbols);
+                spin_reels(gamedata);
 
                 //抽選処理
-                dividend = slot_lottery(reel_symbols, bet);
-                credit += (bet * dividend);
-
-                //結果の表示処理
-                std::cout << "Press the Enter key to spin the slots again with the current bet amount." << std::endl;
-                std::cout << "Press the Back key to return to the initial screen." << std::endl;
-                while(true){
-                    int input_key = get_key();
-                    if(input_key == 13){
-                        choice = GameState::PLAY;
-                        break;
-                    }
-                    else if(input_key == 8){
-                        choice = GameState::START;
-                        break;
-                    }
-                    else{
-                        continue;
-                    }
-                }
+                gamedata.dividend = slot_lottery(gamedata);
+                gamedata.credit += (gamedata.bet * gamedata.dividend);
 
                 //抽選後、クレジットが０以下になった場合、ゲームを終了する。
-                if (credit <= 0) {
-                    std::cout << "Thank you for playing! Your final credit is: " << credit << std::endl;
-                    choice = GameState::EXIT;
+  
+
+                gamedata.gamestate = GameState::PLAY_WAIT;
+                break;
+            }
+            case GameState::PLAY_WAIT:{
+                int input_key = get_key();
+                if(input_key == 13){//ENTER
+                    gamedata.gamestate = GameState::PLAY;
+                    break;
                 }
+                else if(input_key == 8){//BACK
+                    gamedata.gamestate = GameState::START;
+                    break;
+                }
+                else{
+                    continue;
+                }
+            }
+            case GameState::EXIT:{
+                #ifndef _WIN32
+                    endwin();
+                #endif
                 break;
-            case GameState::EXIT:
-                break;
+            }
+
         }
-        if (choice == GameState::EXIT){
-            #ifndef _WIN32
-                endwin();
-            #endif
-                break;
+
+        if (gamedata.credit <= 0) {
+                gamedata.gamestate = GameState::EXIT;
+        }
+
+        if(gamedata.gamestate == GameState::EXIT){
+            get_clear_cli();
+            std::cout << "Thank you for playing! Your final credit is: " << gamedata.credit << std::endl;
+            break;
         }
     }
     return 0;
@@ -130,76 +175,11 @@ void init(){
     #endif
 }
 
-GameState get_choice(int credit) {
-    int choice = 0;
-    render_menu(credit,choice); // メニューを描画する関数を呼び出す
-
-    while(true) {
-    // 上下キーの入力を格納する変数
-        #ifdef _WIN32
-            int key = get_key();
-            if (key == 0 || key == 0xE0) {  
-                        /* 上ボタンが押された場合の処理.
-                        0xE0は拡張キーのプレフィックスコードです。0xは以下のコードが16進数であることを示す接頭辞です。
-                        拡張キーは、通常のキーとは異なる特別なキーであり、矢印キーやファンクションキーなどが含まれます。
-                        _getch()関数は、拡張キーを押した場合、最初に0または0xE0を返し、次に実際のキーコードを返します。*/     
-                        key = get_key();
-                        render_menu(credit,choice); // メニューを描画する関数を呼び出す
-                        if (key == 72) { // 上ボタンが押された場合の処理
-                            choice = (choice - 1 + 2) % 2; // 上ボタンが押された場合、選択肢を上に移動させる。選択肢は0と1の2つなので、2で割った余りを取ることで循環させる。
-                        }
-                        else if (key == 80) { // 下ボタンが押された場合の処理
-                            choice = (choice + 1 ) % 2; // 下ボタンが押された場合、選択肢を下に移動させる。選択肢は0と1の2つなので、2で割った余りを取ることで循環させる。
-                        }
-                    }
-            else if (key == 13) { // 決定ボタンが押された場合
-                        return choice == 0 ? GameState::BET : GameState::EXIT; // 選択肢に応じてGameStateを返す
-                    }
-            else {
-                continue;
-                }
-
-            for (int i = 0; i < 2; i++) {
-                    if (i == choice) {
-                        std::cout << "\033[33m" << (i == 0 ? "Start" : "Exit") << "\033[0m" << std::endl; // 選択中の項目を黄色で表示するANSIエスケープシーケンス
-                    }
-                    else {
-                        std::cout << (i == 0 ? "Start" : "Exit") << std::endl;
-                    }
-                }
-        #else
-            int key = get_key();
-            if(key == KEY_UP){
-                choice = (choice - 1 + 2) % 2;
-            }
-            else if(key == KEY_DOWN){
-                choice = (choice + 1) % 2;
-            }
-
-            if(key == '\n'){
-                return choice == 0 ? GameState::BET : GameState::EXIT;
-            }
-            for (int i = 0; i < 2; i++) {
-                    if (i == choice) {
-                            std::cout << "\033[33m" << (i == 0 ? "Start" : "Exit") << "\033[0m" << std::endl; // 選択中の項目を黄色で表示するANSIエスケープシーケンス
-                    }
-                    else {
-                            std::cout << (i == 0 ? "Start" : "Exit") << std::endl;
-                    }
-                }
-        #endif
-        }
-}
-
 int get_bet(int credit) {
     // ユーザーに有効なベット額を入力させる
     int bet = 0;
-
-        std::cout << "your bet credit: " << bet << std::endl;
         while (true) {
-            std::cout << "\033[2J\033[1;1H";
             //数値以外、マイナス値、クレジット以上の値を入力した場合は再度入力を促す
-            std::cout << "Please enter a valid bet amount: ";
             //このBOOLは入力の成功を真とする。
             if (std::cin >> bet && bet > 0 && bet <= credit) {
                 return bet;
@@ -219,49 +199,87 @@ int get_bet(int credit) {
 }
 
 
-void spin_reels(symbol* real_symbols[]) {
+void spin_reels(GameData &gamedata) {
      for (int i = 0; i < 3; i++) {
-            real_symbols[i] = &symbols[std::rand() % 6];
-            std::cout << real_symbols[i]->name << " ";
+            gamedata.reel_symbols[i] = &symbols[std::rand() % 6];
         }
-        //改行
-        std::cout << "\n" << std::endl;
 }
 
-float slot_lottery(symbol* reel_symbols[], int bet) {
+int slot_lottery(const GameData &gamedata) {
+    int dividend = 0;
         //あたり抽選。シンボルごとに配当を用意する予定。
-        float dividendo = 0.0;
-        if (reel_symbols[0] == reel_symbols[1] && reel_symbols[1] == reel_symbols[2]){
-            std::cout << "\033[33mJACKPOT!!\033[0m" << std::endl;
-            std::cout << "you win" << reel_symbols[0]->multiplier * bet << " credits paied!" << std::endl;
-            dividendo = reel_symbols[0]->multiplier;
+        if (gamedata.reel_symbols[0] == gamedata.reel_symbols[1] && gamedata.reel_symbols[1] == gamedata.reel_symbols[2]){
+            dividend = gamedata.reel_symbols[0]->multiplier;
         }
         else {
-            std::cout << "No win this time. Better luck next spin!\n" << std::endl;
-            dividendo = 0.0;
+            dividend = 0;
         }
 
-        return dividendo;
+        return dividend;
 }
 
-void render_menu(int credit, int choice) {
-        //描画処理。現在の選択肢を黄色で表示する。選択肢の描画は、コンソールのカーソル位置を制御することで実現できる。
-        std::cout << "\033[2J\033[3J\033[1;1H" << std::flush; // 画面をクリアしてカーソルを左上に移動するANSIエスケープシーケンス
-        std::cout << "Welcome to the Slot Game!" << std::endl;
-        std::cout << "You have " << credit << " credits." << std::endl;
-        std::cout << "Please select an option:" << std::endl;
-        std::cout << "------------------------" << std::endl;
-        for (int i = 0; i < 2; i++)
-        {
-            if (i == choice){
-                std::cout << "\033[33m" << (i == 0 ? "Start" : "Exit") << "\033[0m" << std::endl;
+void render_menu(const GameData &gamedata) {
+    //描画処理。現在の選択肢を黄色で表示する。選択肢の描画は、コンソールのカーソル位置を制御することで実現できる。
+    switch (gamedata.gamestate){
+        //各ゲームステートでの描画を設定
+        case GameState::START:
+            //スタートメニューの描画
+            // ユーザーのクレジット残高を表示する
+            // ユーザーの選択に応じて処理を分岐する.０はゲーム開始、１は終了、その他の値は無効な選択として再度入力を促す。
+            get_clear_cli(); // 画面をクリアしてカーソルを左上に移動するANSIエスケープシーケンス
+            std::cout << "Welcome to the Slot Game!" << std::endl;
+            std::cout << "You have " << gamedata.credit << " credits." << std::endl;
+            std::cout << "Please select an option:" << std::endl;
+            std::cout << "------------------------" << std::endl;
+            for (int i = 0; i < 2; i++)
+            {
+                if (i == gamedata.choice){
+                    std::cout << "\033[33m" << (i == 0 ? "Start" : "Exit") << "\033[0m" << std::endl;
+                }
+                else{
+                    std::cout << (i == 0 ? "Start" : "Exit") << std::endl;
+                }
             }
-            else{
-                std::cout << (i == 0 ? "Start" : "Exit") << std::endl;
-            }
+            // カーソルを2行上に移動するANSIエスケープシーケンス
+            std::cout << "\033[0J\033[3F" << std::endl;
+            break;
+
+        case GameState::BET:{
+            std::cout << "your bet credit: " << gamedata.bet << std::endl;
+            std::cout << "\033[2J\033[1;1H";
+            std::cout << "Please enter a valid bet amount: ";
+            break;
         }
-        
-        std::cout << "\033[0J\033[3F" << std::endl;// カーソルを2行上に移動するANSIエスケープシーケンス
+        case GameState::PLAY:{
+            break;
+        }
+        case GameState::PLAY_WAIT:{
+            get_clear_cli();  
+            std::cout << "you bet " << gamedata.bet << " credits." << "your credit is now " << gamedata.credit << std::endl;
+            for(int i = 0; i < 3; i++){
+                std::cout << gamedata.reel_symbols[i]->name << " ";
+            }
+            std::cout << "\n" << std::endl;
+     
+            if (gamedata.dividend > 0){
+                std::cout << "you win" << gamedata.reel_symbols[0]->multiplier * gamedata.bet << " credits paied!" << std::endl;
+                std::cout << "\033[33mJACKPOT!!\033[0m" << std::endl;
+            }
+            else {
+                std::cout << "No win this time. Better luck next spin!\n" << std::endl;
+            }
+
+            //結果の表示処理
+            std::cout << "Press the Enter key to spin the slots again with the current bet amount." << std::endl;
+            std::cout << "Press the Back key to return to the initial screen." << std::endl;
+
+            break;
+        }
+        case GameState::EXIT:{
+            std::cout << "Thank you for playing! Your final credit is: " << gamedata.credit << std::endl;
+            break;
+        }
+    }
         
 }
 
@@ -272,4 +290,9 @@ int get_key(){
     #else
         return getch();
     #endif
+}
+
+void get_clear_cli(){
+    //画面消去、カーソルの先頭位置移動を行う関数
+    std::cout << "\033[2J\033[3J\033[1;1H" << std::flush;
 }
